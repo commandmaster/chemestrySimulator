@@ -6,6 +6,8 @@
         "vector": "cpp",
         "string": "cpp",
         "list": "cpp",
-        "numeric": "cpp"
-    }
+        "numeric": "cpp",
+        "cmath": "cpp"
+    },
+    "liveServer.settings.port": 5501
 }
