@@ -1,0 +1,1 @@
+emcc sim.cpp -o sim.js -sEXPORTED_FUNCTIONS="['_simulate','_get_atoms','_get_atom_count','_init_atoms','_get_atom_size','_get_atom_type_offset','_get_atom_covalent_radius_offset','_get_visible_bond_count','_get_bond_vertices','_spawnAtom']" -sEXPORTED_RUNTIME_METHODS="['cwrap','getValue']" -sALLOW_MEMORY_GROWTH=1

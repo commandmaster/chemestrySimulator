@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Investigating Computer-Simulated Covalent Bonding</title>
+
+    <link rel="stylesheet" href="https://cdn.simplecss.org/simple.css">
+    <style>
+        header, main, footer { padding: 1rem; }
+        pre { background-color: #282c34; padding: 1em; border-radius: 5px; }
+        #simulation-container {
+            border: 2px solid #555;
+            margin: 2rem auto;
+            width: 100%;
+            max-width: 800px;
+            aspect-ratio: 16 / 10;
+            position: relative; 
+            background-color: #0d0d14; 
+        }
+        #glCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <!-- Highlight.js for code formatting -->
+    <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.7.0/styles/github-dark.min.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/cpp.min.js"></script>
+    <script>hljs.highlightAll();</script>
+</head>
+
+<body>
+    <header>
+        <h1>Investigating Computer-Simulated Covalent Bonding</h1>
+    </header>
+
+    <main>
+        <section>
+            <p>
+                <b>Focus Question:</b> <br>
+                How can the principles of covalent bonding, molecular geometry, and chemical reactivity be modeled in a computer simulation? What computational techniques can be used to represent atomic interactions, bond formation, and VSEPR theory?
+            </p>
+
+            <p>
+                <b>Introduction to Molecular Simulation</b> <br>
+                During this chemistry class, we have spent hours studying the mutliple fundamental concepts that make up the chemical domain. One such concept is the bonding of atoms to form molecules. 
+                Understanding how these bonds form, break, and determine the three-dimensional shape of molecules is fundamental to virtually every area of science, from developing new medicines to creating advanced materials. 
+                Computer simulations have always been an interest of mine and a perfect way to explore these concepts. They allow us to visualize the molecular structures, 
+                and simulate chemical reactions in a way that is impossible to observe directly.
+            </p>
+
+            <p>
+                <b>What is a Covalent Bond?</b> <br>
+                A covalent bond is a chemical bond that involves the sharing of electron pairs between atoms. 
+                These shared pairs are known as shared pairs or bonding pairs, and the stable balance of attractive and repulsive forces between atoms when they share electrons is known as covalent bonding. 
+                In this study, we are interested in several key properties of these bonds which my simulation will model:
+                <ul>
+                    <li><b>Bond Length:</b> The average distance between the nuclei of two bonded atoms. I have determined it by the size (covalent radii) of the atoms involved. <b>Note*</b> It would require a massive database to get the exact bonding length for all atoms which is infeasible for this project.  </li>
+                    <li><b>Bond Energy:</b> The energy required to break a particular bond in a molecule (Bond Dissociation Energy). Stronger bonds (e.g., double or triple bonds) require more energy to break.</li>
+                    <li><b>Bond Angles:</b> The angle formed between three atoms across at least two bonds. According to the <b>Valence Shell Electron Pair Repulsion (VSEPR)</b> theory, electron pairs in the valence shell of a central atom repel each other and will arrange themselves to be as far apart as possible, determining the molecule's geometry.</li>
+                </ul>
+            </p>
+        </section>
+
+        <section>
+            <h2>The Computational Model: Position-Based Dynamics</h2>
+            <p>
+                Unlike traditional physics simulations that continuously calculate forces (like \( \vec{F} = m\vec{a} \)),
+                 my simulation uses a more modern and stable approach called <b>Position-Based Dynamics (PBD)</b>. The core idea is simple:
+            </p>
+            <ol>
+                <li><b>Move the Atoms:</b> First, we predict the new position of each atom based on its current velocity, using a technique called <b>Verlet Integration</b>. 
+                    This method is numerically stable and excellent for simulations like this.</li>
+                <li><b>Solve Constraints:</b> After the atoms have moved, we check for any "rule violations." 
+                    For example, two bonded atoms might be too far apart, or two non-bonded atoms might be overlapping. 
+                    We then iteratively adjust their positions to satisfy these rules, or "constraints."</li>
+            </ol>
+            <p>This two-step process, repeated many times per second, allows complex, realistic behavior to emerge from a set of simple geometric rules.</p>
+            
+            <h3>Step 1: Verlet Integration</h3>
+            <p>
+                The simulation first updates each atom's position based on its previous position, effectively carrying its momentum forward. The code for this is surprisingly simple:
+            </p>
+            <pre><code class="language-cpp">
+// From sim.cpp
+void updatePositions(float dt) {
+    for (int i = 0; i < atomCount; ++i) {
+        // Velocity is implicitly (x - old_x)
+        float vel_x = (atoms[i].x - atoms[i].old_x) * Constants::DAMPING_FACTOR;
+        float vel_y = (atoms[i].y - atoms[i].old_y) * Constants::DAMPING_FACTOR;
+        
+        // Store current position
+        atoms[i].old_x = atoms[i].x;
+        atoms[i].old_y = atoms[i].y;
+        
+        // Perform Verlet integration
+        atoms[i].x += vel_x + atoms[i].ax * dt * dt;
+        atoms[i].y += vel_y + atoms[i].ay * dt * dt;
+
+        // Reset acceleration
+        atoms[i].ax = 0;
+        atoms[i].ay = 0;
+    }
+}
+            </code></pre>
+        </section>
+
+        <section>
+            <h2>Modeling Bonds and Molecules</h2>
+            <p>
+                The "magic" of the simulation happens in the constraint-solving step. Here, we enforce the rules that will allow for the interactions between atoms, and the bonding behavior.
+            </p>
+            
+            <h3>Bond Length Constraint</h3>
+            <p>The most fundamental constraint is bond length. The simulation ensures that two bonded atoms remain at a distance equal to their ideal bond length, which is calculated as the sum of their covalent radii. 
+                If they drift too far apart or get too close, the solver pushes them back into place. The correction is weighted by mass, so a heavy atom moves less than a light one. <b>Ex.</b> Hydrogen would move more than Sulfur.</p>
+
+            <pre><code class="language-cpp">
+// A snippet from the `solveConstraints` function in sim.cpp
+for (const auto& bond : bondPool) {
+    Atom* a1 = bond.atom1;
+    Atom* a2 = bond.atom2;
+
+    float dx = a2->x - a1->x;
+    float dy = a2->y - a1->y;
+    float dist = std::sqrt(dx * dx + dy * dy);
+    if (dist < 1e-9f) { dist = 1e-9f; }
+
+    // Calculate how much to correct the positions
+    float diff = (dist - static_cast<float>(bond.idealLength)) / dist;
+    float response = diff * Constants::CONSTRAINT_STRENGTH;
+
+    // Apply corrections weighted by inverse mass
+    float totalMass = a1->atomicMass + a2->atomicMass;
+    if (totalMass < 1e-9f) continue;
+    float w1 = (a2->atomicMass / totalMass); // Atom 1's correction
+    float w2 = (a1->atomicMass / totalMass); // Atom 2's correction
+
+    a1->x += response * dx * w1;
+    a1->y += response * dy * w1;
+    a2->x -= response * dx * w2;
+    a2->y -= response * dy * w2;
+}
+            </code></pre>
+
+            <h3>Bond Angle Constraint (VSEPR)</h3>
+            <p>
+                To create realistic molecular shapes, the simulation implements VSEPR theory. 
+                It first determines the ideal angle for a central atom based on how many other atoms it's bonded to. 
+                For example, an atom with two bonds will aim for a 180° (linear) geometry, while an atom with four bonds will aim for 109.5° (tetrahedral). 
+                The constraint solver then works to achieve these angles by adjusting the positions of the bonded atoms. I have had to make some addaptations for it to work in 2D, but the principles remain the same.
+                For the sake of simplicity, I have only implemented the ideal angles for linear, trigonal planar, and tetrahedral geometries (ignoring lone pairs). 
+            </p>
+            <pre><code class="language-cpp">
+// from sim.cpp
+float getIdealAngleFor(Atom* centralAtom) {
+    int bondCount = centralAtom->bonds.size();
+    if (bondCount <= 1) return 0.0f; // No angle to form
+    if (bondCount == 2) return 180.0f; // Linear
+    if (bondCount == 3) return 120.0f; // Trigonal Planar
+    if (bondCount >= 4) return 109.5f; // Tetrahedral (projected onto 2D)
+    return 0.0f;
+}
+            </code></pre>
+
+            <hr>
+            <h2>Live Simulation Demo</h2>
+            <p>The interactive simulation below demonstrates these principles. 
+                Click anywhere inside the box to spawn a new random atom. You can see how atoms form bonds when they get close, and how higher energy bonds will take precedence over lower energy ones. 
+                The legend on the left explains the color coding for atoms and bonds.</p>
+            
+            <div id="simulation-container">
+                <canvas id="glCanvas"></canvas>
+            </div>
+            <!-- Load the Emscripten-generated file first -->
+            <script src="sim.js"></script>
+            <!-- Then load our application logic -->
+            <script src="app.js"></script>
+            <hr>
+
+        </section>
+
+        <section>
+            <h2>Simulating Chemical Reactions</h2>
+            <p>A static model is not very interesting. This simulation also models basic chemical reactivity by dynamically creating, upgrading, and breaking bonds based on simple rules:</p>
+            <ul>
+                <li><b>Bond Formation:</b> If two atoms get close enough and both have "available valence" (i.e., they can form more bonds), a new single bond is created between them.</li>
+                <li><b>Bond Strengthening:</b> If two already-bonded atoms have available valence, the simulation can upgrade their bond from single to double, or double to triple. This is decided by checking if the higher-order bond is energetically more favorable, using the Bond Dissociation Energy data.</li>
+                <li><b>Bond Breakage:</b> If a bond is stretched far beyond its ideal length (e.g., due to a collision), it breaks.</li>
+            </ul>
+            <p>This logic is handled by a function that periodically checks the state of all atoms.</p>
+            <pre><code class="language-cpp">
+// A simplified view of the logic in `checkAndModifyBonds` from sim.cpp
+void checkAndModifyBonds() {
+    // Check for bond formation/strengthening
+    for (int i = 0; i < atomCount; ++i) {
+        for (int j = i + 1; j < atomCount; ++j) {
+            Atom* a1 = &atoms[i];
+            Atom* a2 = &atoms[j];
+            
+            // Is distance right for bonding?
+            if (/* distance is close enough */) {
+                
+                // Do both atoms have available valence?
+                if (/* availableValence1 >= 1 && availableValence2 >= 1 */) {
+                    Bond* existingBond = findBondBetween(a1, a2);
+                    if (existingBond) {
+                        // Try to upgrade bond to double/triple
+                        // ...
+                    } else {
+                        // Create a new single bond
+                        createBond(a1, a2, 1);
+                    }
+                }
+            }
+        }
+    }
+
+    // Check for bond breakage
+    for (auto& bond : bondPool) {
+        // Is bond stretched too much?
+        if (bond.calculateLength() > bond.idealLength * STRETCH_FACTOR) {
+            // Mark bond for breakage
+            // ...
+        }
+    }
+}
+            </code></pre>
+        </section>
+
+        <section>
+            <h2>Conclusion</h2>
+            <p>
+                This self-directed study demonstrates that the complex world of covalent bonding can be effectively modeled using computational techniques. 
+                By translating fundamental chemical principles—such as bond length, VSEPR theory, valence, and bond energy—into a set of constraints, the Position-Based Dynamics simulation successfully recreates basic molecular behavior. 
+                We observed atoms self-assembling into molecules with realistic shapes, and even saw basic chemical reactions like bond formation and breakage emerge from simple rules. 
+                This project highlights the power of simulation not just as a tool for prediction, but as a way to gain a deeper, more intuitive understanding of the invisible forces that shape our world at the molecular level. 
+                Future work could expand this 2D model into 3D and incorporate other interactions like hydrogen bonds and ionic forces to create an even more comprehensive chemical simulator.
+            </p>
+        </section>
+        
+        <section>
+            <h2>Sources</h2>
+            <p>
+                The primary data for this simulation was sourced from a standard chemistry table from LibreTexts (bond energy averages). The computational methods are based on established techniques in computer graphics and physics simulation.
+            </p>
+            <p>
+                Chemistry LibreTexts. (2025, April 3). Bond energies. Chemistry LibreTexts. https://chem.libretexts.org/Bookshelves/Physical_and_Theoretical_Chemistry_Textbook_Maps/Supplemental_Modules_(Physical_and_Theoretical_Chemistry)/Chemical_Bonding/Fundamentals_of_Chemical_Bonding/Bond_Energies
+            </p>
+            <p>
+                Chemistry LibreTexts. (2025, February 19). Lennard-Jones potential. Chemistry LibreTexts. https://chem.libretexts.org/Bookshelves/Physical_and_Theoretical_Chemistry_Textbook_Maps/Supplemental_Modules_(Physical_and_Theoretical_Chemistry)/Physical_Properties_of_Matter/Atomic_and_Molecular_Properties/Intermolecular_Forces/Specific_Interactions/Lennard-Jones_Potential
+            </p>
+            <p>
+                Pikuma RSS. (n.d.). Verlet integration and cloth physics simulation. Pikuma RSS. Retrieved June 14, 2025, from https://pikuma.com/blog/verlet-integration-2d-cloth-physics-simulation
+            </p>
+        </section>
+    </main>
+
+    <footer>
+        <p>
+            © 2024 Investigating Computer-Simulated Covalent Bonding <br>
+            Bennett Friesen <br>
+            <a target="_blank" rel="noopener noreferrer" href="">Code (Github Repo)</a>
+        </p>
+    </footer>
+
+</body>
+</html>
