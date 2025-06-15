@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Covalent Bonding Full Screen</title>
+</head>
+
+<style>
+
+#simulation-container {
+    background-color: #00ff95; 
+    width: 100%;
+    height: 100%;
+    padding: 0%;
+    margin : 0%;
+    border-color: #00ff95;
+}
+
+</style>
+
+<div id="simulation-container">
+    <canvas id="glCanvas"></canvas>
+</div>
+<!-- Load the Emscripten-generated file first -->
+<script src="sim.js"></script>
+<!-- Then load our application logic -->
+<script src="app.js"></script>
